@@ -53,4 +53,17 @@ int main(){
     r={6,0,0,0};assert(Assigned(Ak820Factory,49,r.data(),true)==0);
     r={13,0,0,1};assert(Assigned(Ak820Factory,49,r.data(),true)==0);
     r={2,0,45,0};assert(Assigned(Ak820Factory,48,r.data(),true)==45);
+    // EPOMAKER HE80 0C45:8092: AK820 Driveall table plus Insert at position 103 (tester capture 2026-11-22).
+    std::array<bool,0x410> he80Seen{};unsigned he80Count=0;
+    for(auto hid:He80Factory)if(hid){assert(hid<he80Seen.size() && !he80Seen[hid]);he80Seen[hid]=true;++he80Count;}
+    assert(he80Count==83 && KeyCount(He80Pid)==83 && &FactoryFor(He80Pid)==&He80Factory);
+    assert(He80Factory[0]==41 && He80Factory[34]==26 && He80Factory[49]==4 && He80Factory[50]==22 && He80Factory[51]==7);
+    assert(He80Factory[92]==42 && He80Factory[103]==73 && He80Factory[104]==74 && Ak820Factory[103]==0);
+    assert(He80Admitted && SupportedProduct(He80Pid) && !SupportedProduct(0x8093) && Token(He80Pid)==He80LayoutToken && InfoLength(He80Pid)==48);
+    assert(Identity(He80Pid,0x0c45,He80Pid,0,0) && !Identity(He80Pid,0x0c45,Ak820Pid,0,0) && !Identity(Ak820Pid,0x0c45,He80Pid,0,0));
+    assert(!Identity(He80Pid,0x0416,He80Pid,0,0) && !Identity(0x80a2,0x0c45,He80Pid,0x0166,0x110c) && !Identity(He80Pid,0x0c45,0x80a2,0x0166,0x110c));
+    assert(Driveall(He80Pid) && Driveall(Ak820Pid) && !Driveall(0x80a2) && !Driveall(0x8032));
+    r={0,0,0,0};assert(Assigned(He80Factory,103,r.data(),true)==73 && Assigned(Ak820Factory,103,r.data(),true)==0);
+    // The HE80 repeats held keys continuously: the 50 ms freshness path applies, not the AK820 hold path.
+    assert(Read(Pack(170,34,1000),1050)==500 && Read(Pack(170,34,1000),1051)==0 && Read(Pack(400,38,1000),1000)==1000);
 }

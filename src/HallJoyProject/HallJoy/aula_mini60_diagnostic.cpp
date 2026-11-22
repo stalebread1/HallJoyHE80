@@ -97,7 +97,7 @@ std::vector<Device> Find(){
         if(!SetupDiGetDeviceInterfaceDetailW(list,&item,detail,size,nullptr,nullptr))continue;
         std::wstring path=detail->DevicePath;std::wstring lower=path;
         std::transform(lower.begin(),lower.end(),lower.begin(),towlower);
-        if(lower.find(L"vid_0c45&pid_8032")==std::wstring::npos && lower.find(L"vid_0c45&pid_80a2")==std::wstring::npos && lower.find(L"vid_0c45&pid_80a1")==std::wstring::npos && lower.find(L"vid_0c45&pid_80b1")==std::wstring::npos && lower.find(L"vid_0c45&pid_fefe")==std::wstring::npos && lower.find(L"vid_0c45&pid_fefc")==std::wstring::npos)continue;
+        if(lower.find(L"vid_0c45&pid_8032")==std::wstring::npos && lower.find(L"vid_0c45&pid_80a2")==std::wstring::npos && lower.find(L"vid_0c45&pid_80a1")==std::wstring::npos && lower.find(L"vid_0c45&pid_80b1")==std::wstring::npos && lower.find(L"vid_0c45&pid_8092")==std::wstring::npos && lower.find(L"vid_0c45&pid_fefe")==std::wstring::npos && lower.find(L"vid_0c45&pid_fefc")==std::wstring::npos)continue;
         Handle meta(CreateFileW(path.c_str(),0,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,0,nullptr));
         if(!meta){Event("metadata_open_failed",GetLastError());continue;}
         HIDD_ATTRIBUTES attr{};attr.Size=sizeof(attr);
@@ -298,7 +298,7 @@ int Capture(bool cleanupOnly){
                 for(unsigned retry=0;retry<2 && !Stop();++retry)if(s.Exchange(0x12,n,off,&reply)){ok=true;break;}
                 if(ok)for(unsigned j=0;j<n;++j){map[off+j]=reply[8+j];valid[off+j]=true;}
             }
-            const bool driveall=devices[0].productId==halljoy::mini60::Ak820Pid;
+            const bool driveall=halljoy::mini60::Driveall(devices[0].productId);
             for(unsigned k=0;k<126;++k){unsigned o=k*4;if(!valid[o] || !valid[o+3])continue;
                 if(driveall && !map[o])continue; // factory default; only changed records are evidence
                 Line("assignment index="+std::to_string(k)+" type="+std::to_string(map[o])+" p1="+std::to_string(map[o+1])+" p2="+std::to_string(map[o+2])+" p3="+std::to_string(map[o+3])+
@@ -307,7 +307,7 @@ int Capture(bool cleanupOnly){
             if(liveWorker && std::all_of(valid.begin(),valid.end(),[](bool v){return v;})){
                 unsigned mapped=0,unsupported=0;const auto& factory=halljoy::mini60::FactoryFor(devices[0].productId);
                 for(unsigned k=0;k<126;++k){
-                    auto usage=halljoy::mini60::Assigned(factory,k,map.data()+k*4,devices[0].productId==halljoy::mini60::Ak820Pid);
+                    auto usage=halljoy::mini60::Assigned(factory,k,map.data()+k*4,halljoy::mini60::Driveall(devices[0].productId));
                     InterlockedExchange(&shared->assigned[k],usage);mapped+=usage!=0;
                     unsupported+=factory[k] && !usage;
                 }
@@ -662,7 +662,8 @@ void NativeTelemetry(NativeAnalogBackendTelemetry* out){
     if(out->connected)out->verifiedLayoutToken=NativeToken();
     const auto product=nativeProduct.load();
     if(product==halljoy::mini60::Ak820Pid)wcscpy_s(out->deviceName,L"AJAZZ AK820 MAX HE (0C45:80B1)");
-    wcscpy_s(out->status,product==0x8032?L"MINI60 HE: wired analog; per-key freshness 50 ms":product==0x80a1?L"MINI60 HE MAX: wired analog; per-key freshness 50 ms":product==halljoy::mini60::Ak820Pid?L"AJAZZ AK820 MAX HE 0C45:80B1: wired analog; per-key freshness 50 ms":L"MINI60 HE Pro: wired analog; per-key freshness 50 ms");
+    else if(product==halljoy::mini60::He80Pid)wcscpy_s(out->deviceName,L"EPOMAKER HE80 (0C45:8092)");
+    wcscpy_s(out->status,product==0x8032?L"MINI60 HE: wired analog; per-key freshness 50 ms":product==0x80a1?L"MINI60 HE MAX: wired analog; per-key freshness 50 ms":product==halljoy::mini60::Ak820Pid?L"AJAZZ AK820 MAX HE 0C45:80B1: wired analog; per-key freshness 50 ms":product==halljoy::mini60::He80Pid?L"EPOMAKER HE80 0C45:8092: wired analog; per-key freshness 50 ms":L"MINI60 HE Pro: wired analog; per-key freshness 50 ms");
 }
 
 void Supervise() noexcept {

@@ -16,13 +16,20 @@ inline constexpr const wchar_t* BasePreset=L"Aula MINI60 HE ANSI";
 inline constexpr unsigned Ak820Pid=0x80b1;
 inline constexpr std::uint64_t Ak820LayoutToken=halljoy::layout_identity::Token("ajazz-m484","SG8994HERGB");
 static_assert(Ak820LayoutToken!=0);
+// EPOMAKER HE80 (0C45:8092), tester capture 2026-11-22. Same Sonix/Driveall AA/55 command set and 55 FB
+// stream as MINI60 and AK820. Unlike the AK820 (changes only), the HE80 repeats every held key's report
+// continuously, so it uses the MINI60 50 ms freshness path (Read), not the AK820 hold path (Held).
+// Layout: the AK820 MAX HE ANSI geometry (same Driveall positions); the HE80 adds Insert at position 103.
+inline constexpr unsigned He80Pid=0x8092;
+inline constexpr std::uint64_t He80LayoutToken=Ak820LayoutToken;
+inline constexpr bool He80Admitted=true;
 // Owner decision 2026-10-08: 0C45:80B1 is not supported (red). The implementation
 // stays in the tree but is not admitted; set to true only with a new decision.
 inline constexpr bool Ak820Admitted=false;
-inline constexpr bool SupportedProduct(unsigned pid){return pid==0x80a2 || pid==0x80a1 || pid==0x8032 || (Ak820Admitted && pid==Ak820Pid);}
-inline constexpr std::uint64_t Token(unsigned pid){return pid==0x80a1?MaxLayoutToken:pid==0x80a2?LayoutToken:pid==0x8032?BaseLayoutToken:pid==Ak820Pid?Ak820LayoutToken:0;}
+inline constexpr bool SupportedProduct(unsigned pid){return pid==0x80a2 || pid==0x80a1 || pid==0x8032 || (Ak820Admitted && pid==Ak820Pid) || (He80Admitted && pid==He80Pid);}
+inline constexpr std::uint64_t Token(unsigned pid){return pid==0x80a1?MaxLayoutToken:pid==0x80a2?LayoutToken:pid==0x8032?BaseLayoutToken:pid==Ak820Pid?Ak820LayoutToken:pid==He80Pid?He80LayoutToken:0;}
 // Driveall reads 48 device-info bytes; the AULA SDK reads 56.
-inline constexpr unsigned InfoLength(unsigned pid){return pid==Ak820Pid?48:56;}
+inline constexpr unsigned InfoLength(unsigned pid){return (pid==Ak820Pid || pid==He80Pid)?48:56;}
 inline constexpr bool Identity(unsigned descriptorPid,unsigned vid,unsigned pid,unsigned manufacturer,unsigned product,bool namedMini60Pro=false){
     // Base/MAX device-info product is supplied by the MCU identification register,
     // not a fixed value in the firmware. Keep the established PRO restriction, but accept a
@@ -31,7 +38,7 @@ inline constexpr bool Identity(unsigned descriptorPid,unsigned vid,unsigned pid,
     // echo still match (owner rule: the device in the log is the tester's model).
     // AK820 manufacturer/product values are unknown: the device-info VID/PID
     // echo is the proof, and the values are logged.
-    if(pid==Ak820Pid)return vid==0x0c45 && pid==descriptorPid;
+    if(pid==Ak820Pid || pid==He80Pid)return vid==0x0c45 && pid==descriptorPid;
     return vid==0x0c45 && SupportedProduct(pid) && pid==descriptorPid &&
         manufacturer==0x0166 && (pid!=0x80a2 || product==0x110c || namedMini60Pro);
 }
@@ -42,11 +49,15 @@ inline constexpr std::array<std::uint16_t,126> Factory={
 // Driveall config 3141:32945 "AK820MAX" keyList: value -> keyCode (82 keys, Fn 0xAF -> 0x409).
 inline constexpr std::array<std::uint16_t,126> Ak820Factory={
 41,58,59,60,61,62,63,64,65,66,67,68,69,0,0,0,53,30,31,32,33,34,35,36,37,38,39,45,46,0,0,0,43,20,26,8,21,23,28,24,12,18,19,47,48,0,0,0,57,4,22,7,9,10,11,13,14,15,51,52,49,0,0,0,225,29,27,6,25,5,17,16,54,55,56,229,40,0,0,0,224,227,226,44,230,1033,0,228,80,81,82,79,42,0,0,0,0,0,0,0,0,0,0,0,74,75,76,77,78,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-inline constexpr const std::array<std::uint16_t,126>& FactoryFor(unsigned pid){return pid==Ak820Pid?Ak820Factory:Factory;}
+// EPOMAKER HE80 0C45:8092 key map: 77 of 78 captured keys equal the AK820 table; Insert (103) is extra.
+inline constexpr std::array<std::uint16_t,126> He80Factory={41,58,59,60,61,62,63,64,65,66,67,68,69,0,0,0,53,30,31,32,33,34,35,36,37,38,39,45,46,0,0,0,43,20,26,8,21,23,28,24,12,18,19,47,48,0,0,0,57,4,22,7,9,10,11,13,14,15,51,52,49,0,0,0,225,29,27,6,25,5,17,16,54,55,56,229,40,0,0,0,224,227,226,44,230,1033,0,228,80,81,82,79,42,0,0,0,0,0,0,0,0,0,0,73,74,75,76,77,78,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+inline constexpr const std::array<std::uint16_t,126>& FactoryFor(unsigned pid){return pid==Ak820Pid?Ak820Factory:pid==He80Pid?He80Factory:Factory;}
+// Driveall-family boards keep advanced-key pages on their physical key (see Assigned).
+inline constexpr bool Driveall(unsigned pid){return pid==Ak820Pid || pid==He80Pid;}
 inline constexpr unsigned KeyCount(unsigned pid){
     unsigned n=0;for(auto hid:FactoryFor(pid))n+=hid!=0;return n;
 }
-static_assert(KeyCount(0x80a2)==61 && KeyCount(Ak820Pid)==82);
+static_assert(KeyCount(0x80a2)==61 && KeyCount(Ak820Pid)==82 && KeyCount(He80Pid)==83);
 inline bool KeyboardUsage(unsigned u){return (u>=4 && u<=0xa4) || (u>=0xe0 && u<=0xe7);}
 // Driveall advanced-key pages on a physical key: DKS 8, MT 9, TGL 10,
 // SOCD 11, RS 12 (AK820 advancedKeysList). The key still reports its own depth,
